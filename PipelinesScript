@@ -1,0 +1,32 @@
+node{
+    
+    def buildNumber = BUILD_NUMBER
+    stage("Git Clone"){
+        git url: 'https://github.com/Renatoksh/Renatoksh-DevOps_Project_Jenkins_Docker_Integration.git', branch:'main'
+    }
+
+       
+    stage("Maven Clean Pacakge"){
+        def mavenHome= tool name: "Maven",type: "maven"
+         sh "${mavenHome}/bin/mvn clean package"
+    }
+    
+    stage("Build Docker Image"){
+        sh "docker build -t renatoksh/java-web-app-docker:${buildNumber} ."
+    }
+    
+    stage("Docker Login And Push"){
+        withCredentials([string(credentialsId: 'DockerHubPwd', variable: 'DockerHubPwd')]){
+            sh "docker login -u renatoksh -p ${DockerHubPwd}"
+         }
+        
+    }
+        sh "docker push renatoksh/java-web-app-docker:${buildNumber}"
+
+    stage("Deploy Application as Docker Container In Docker Deployment Server"){
+        sshagent(['Docker_Dev_Server_SSH']) {
+            sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.33.4 docker rm -f javawebappcontainer || true"
+            sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.33.4 docker run -d -p 8080:8080 --name javawebappcontainer renatoksh/java-web-app-docker:${buildNumber}"
+        }
+    }
+}
